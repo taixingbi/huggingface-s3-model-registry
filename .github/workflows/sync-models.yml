@@ -1,0 +1,65 @@
+name: sync-models
+
+# Syncs models/registry.yaml into the S3 registry. Runs on pushes that touch
+# the registry file, plus a daily schedule to pick up upstream HF revision
+# changes, plus manual dispatch for one-off backfills.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "models/registry.yaml"
+      - "src/sync_models.py"
+      - ".github/workflows/sync-models.yml"
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Optional: sync a single model id (e.g. BAAI/bge-base-en-v1.5)"
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run (download + validate, skip S3 writes)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: sync-models
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r src/requirements.txt
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_SYNC_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: sync models to S3
+        env:
+          # Secret scoped to just this step — never exported globally.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          ARGS="--bucket ${{ vars.MODEL_REGISTRY_BUCKET }}"
+          if [ -n "${{ inputs.only }}" ]; then
+            ARGS="$ARGS --only \"${{ inputs.only }}\""
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          eval python src/sync_models.py $ARGS

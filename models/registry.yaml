@@ -1,0 +1,25 @@
+# Registry of Hugging Face models to mirror into the S3 model registry.
+#
+# type must be one of: inference, embedding, reranker, classifier
+# revision is optional (defaults to "main"); pin it for reproducible syncs.
+# allow_patterns / ignore_patterns are optional glob lists passed straight
+# through to huggingface_hub.snapshot_download to control which files sync
+# (useful for skipping .bin duplicates when safetensors are present, or for
+# excluding non-English/quantized variants).
+
+models:
+  - id: meta-llama/Llama-3.1-8B-Instruct
+    type: inference
+    revision: main
+    allow_patterns:
+      - "*.safetensors"
+      - "*.json"
+      - "tokenizer*"
+
+  - id: BAAI/bge-base-en-v1.5
+    type: embedding
+    revision: main
+
+  - id: BAAI/bge-reranker-v2-m3
+    type: reranker
+    revision: main
