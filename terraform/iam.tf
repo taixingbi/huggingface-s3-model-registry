@@ -55,6 +55,35 @@ data "aws_iam_policy_document" "gha_assume_protected_branch" {
   }
 }
 
+# terraform-apply.yml runs its job with `environment: production`. Any job
+# that declares a GitHub Actions `environment:` gets an OIDC sub claim of
+# repo:ORG/REPO:environment:NAME instead of repo:ORG/REPO:ref:refs/heads/BRANCH
+# — so gha_apply needs its own trust condition matching that form, not the
+# branch-ref one used by gha_assume_protected_branch above.
+data "aws_iam_policy_document" "gha_assume_environment" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [local.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_org}/${var.github_repo}:environment:${var.github_environment}"]
+    }
+  }
+}
+
 # --- terraform plan (read-only, any ref / PRs) -------------------------------
 
 resource "aws_iam_role" "gha_plan" {
@@ -97,7 +126,7 @@ data "aws_iam_policy_document" "plan_readonly" {
 
 resource "aws_iam_role" "gha_apply" {
   name               = "gha-huggingface-registry-apply"
-  assume_role_policy = data.aws_iam_policy_document.gha_assume_protected_branch.json
+  assume_role_policy = data.aws_iam_policy_document.gha_assume_environment.json
 }
 
 resource "aws_iam_role_policy" "gha_apply" {

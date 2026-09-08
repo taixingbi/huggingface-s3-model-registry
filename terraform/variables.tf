@@ -27,9 +27,15 @@ variable "github_repo" {
 }
 
 variable "github_branch" {
-  description = "Branch allowed to assume the terraform-apply / sync-models role via OIDC. Pull requests from other branches only get plan/read access."
+  description = "Branch allowed to assume the sync-models role via OIDC (that workflow has no `environment:` key, so its OIDC sub claim is branch-ref based). Pull requests from other branches only get plan/read access."
   type        = string
   default     = "main"
+}
+
+variable "github_environment" {
+  description = "GitHub Actions environment name that gates the terraform-apply role. Must match the `environment:` value set on the apply job in terraform-apply.yml, since that changes the workflow's OIDC sub claim to repo:ORG/REPO:environment:NAME."
+  type        = string
+  default     = "production"
 }
 
 variable "model_type_prefixes" {
