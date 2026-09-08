@@ -33,6 +33,13 @@ concurrency:
   group: sync-models
   cancel-in-progress: false
 
+env:
+  # Not secrets — role ARN, region, and bucket name are safe to keep
+  # in-repo. Only HF_TOKEN needs to live in GitHub Secrets (below).
+  AWS_REGION: us-east-1
+  AWS_SYNC_ROLE_ARN: arn:aws:iam::646821141010:role/gha-huggingface-registry-sync
+  MODEL_REGISTRY_BUCKET: huggingface-model-registry-646821141010-us-east-1
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -47,15 +54,15 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_SYNC_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_SYNC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: sync models to S3
         env:
           # Secret scoped to just this step — never exported globally.
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          ARGS="--bucket ${{ vars.MODEL_REGISTRY_BUCKET }}"
+          ARGS="--bucket ${{ env.MODEL_REGISTRY_BUCKET }}"
           if [ -n "${{ inputs.only }}" ]; then
             ARGS="$ARGS --only \"${{ inputs.only }}\""
           fi
