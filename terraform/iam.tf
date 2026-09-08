@@ -17,6 +17,13 @@
 locals {
   # repo:OWNER@OWNER_ID/REPO@REPO_ID — see NOTE above.
   github_sub_repo = "${var.github_org}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
+
+  # The tfstate S3 bucket + DynamoDB lock table (main.tf backend block) are
+  # bootstrapped by hand outside this config, so their names/ARNs are
+  # literals here rather than resource references — keep in sync with main.tf.
+  tf_state_bucket   = "huggingface-s3-model-registry-tfstate-${var.aws_account_id}"
+  tf_state_key      = "huggingface-s3-model-registry/terraform.tfstate"
+  tf_lock_table_arn = "arn:aws:dynamodb:${var.aws_region}:${var.aws_account_id}:table/huggingface-s3-model-registry-tf-lock"
 }
 
 data "aws_iam_policy_document" "gha_assume_any_ref" {
@@ -109,6 +116,41 @@ resource "aws_iam_role_policy" "gha_plan" {
   policy = data.aws_iam_policy_document.plan_readonly.json
 }
 
+# Separate from plan_readonly above because that data source is also reused
+# by aws_iam_role_policy.registry_read (the EKS/vLLM/RAG consumer role),
+# which must never get access to the tfstate bucket/lock table.
+resource "aws_iam_role_policy" "gha_plan_state" {
+  name   = "terraform-state-read"
+  role   = aws_iam_role.gha_plan.id
+  policy = data.aws_iam_policy_document.terraform_state_read.json
+}
+
+data "aws_iam_policy_document" "terraform_state_read" {
+  statement {
+    sid    = "TerraformStateS3Read"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      "arn:aws:s3:::${local.tf_state_bucket}",
+      "arn:aws:s3:::${local.tf_state_bucket}/${local.tf_state_key}",
+    ]
+  }
+
+  statement {
+    sid    = "TerraformStateLock"
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:DeleteItem",
+    ]
+    resources = [local.tf_lock_table_arn]
+  }
+}
+
 data "aws_iam_policy_document" "plan_readonly" {
   statement {
     sid    = "S3Read"
@@ -145,6 +187,39 @@ resource "aws_iam_role_policy" "gha_apply" {
   name   = "terraform-apply"
   role   = aws_iam_role.gha_apply.id
   policy = data.aws_iam_policy_document.apply_write.json
+}
+
+resource "aws_iam_role_policy" "gha_apply_state" {
+  name   = "terraform-state-write"
+  role   = aws_iam_role.gha_apply.id
+  policy = data.aws_iam_policy_document.terraform_state_write.json
+}
+
+data "aws_iam_policy_document" "terraform_state_write" {
+  statement {
+    sid    = "TerraformStateS3Write"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      "arn:aws:s3:::${local.tf_state_bucket}",
+      "arn:aws:s3:::${local.tf_state_bucket}/${local.tf_state_key}",
+    ]
+  }
+
+  statement {
+    sid    = "TerraformStateLock"
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:DeleteItem",
+    ]
+    resources = [local.tf_lock_table_arn]
+  }
 }
 
 data "aws_iam_policy_document" "apply_write" {
