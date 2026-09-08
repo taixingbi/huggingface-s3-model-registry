@@ -70,6 +70,39 @@ resource "aws_s3_bucket_lifecycle_configuration" "model_registry" {
   }
 }
 
+# Read access for any IAM principal in this AWS account (646821141010) — not
+# public to the internet. block_public_buckets above doesn't affect this: S3
+# only treats a bucket policy as "public" if it grants access to "*" or an
+# AWS-authenticated-users group, not a specific account's root ARN. Anything
+# outside this account still has zero access (no bucket policy grants it, and
+# public access block would reject it even if one tried to).
+data "aws_iam_policy_document" "model_registry_account_read" {
+  statement {
+    sid    = "AccountWideRead"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      aws_s3_bucket.model_registry.arn,
+      "${aws_s3_bucket.model_registry.arn}/*",
+    ]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${var.aws_account_id}:root"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "model_registry_account_read" {
+  bucket = aws_s3_bucket.model_registry.id
+  policy = data.aws_iam_policy_document.model_registry_account_read.json
+
+  depends_on = [aws_s3_bucket_public_access_block.model_registry]
+}
+
 # Placeholder "folder" markers so the prefixes show up immediately in the
 # console before the first sync runs. Purely cosmetic — S3 has no real
 # directories, and sync_models.py works fine without these.
