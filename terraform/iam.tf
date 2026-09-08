@@ -171,7 +171,7 @@ data "aws_iam_policy_document" "plan_readonly" {
   statement {
     sid       = "IamRead"
     effect    = "Allow"
-    actions   = ["iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies", "iam:GetOpenIDConnectProvider"]
+    actions   = ["iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "iam:GetOpenIDConnectProvider"]
     resources = ["*"]
   }
 }
@@ -239,7 +239,7 @@ data "aws_iam_policy_document" "apply_write" {
     sid    = "IamManageScoped"
     effect = "Allow"
     actions = [
-      "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies",
+      "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
       "iam:CreateRole", "iam:DeleteRole", "iam:TagRole",
       "iam:PutRolePolicy", "iam:DeleteRolePolicy",
       "iam:GetOpenIDConnectProvider", "iam:UpdateOpenIDConnectProviderThumbprint",
