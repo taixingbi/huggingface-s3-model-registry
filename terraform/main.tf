@@ -8,15 +8,16 @@ terraform {
     }
   }
 
-  # Remote state is account-specific — fill this in (or pass via -backend-config
-  # in CI) rather than hardcoding a bucket/table here.
-  # backend "s3" {
-  #   bucket         = "REPLACE_ME-terraform-state"
-  #   key            = "huggingface-s3-model-registry/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   dynamodb_table = "REPLACE_ME-terraform-locks"
-  #   encrypt        = true
-  # }
+  # Shared by local runs and CI (.github/workflows/terraform-*.yml) so both
+  # see the same state — without this, CI starts from empty state every run
+  # and tries to recreate resources that already exist.
+  backend "s3" {
+    bucket         = "huggingface-s3-model-registry-tfstate-646821141010"
+    key            = "huggingface-s3-model-registry/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "huggingface-s3-model-registry-tf-lock"
+    encrypt        = true
+  }
 }
 
 provider "aws" {

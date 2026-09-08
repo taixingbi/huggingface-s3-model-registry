@@ -26,6 +26,11 @@ env:
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: "646821141010"
   AWS_APPLY_ROLE_ARN: arn:aws:iam::646821141010:role/gha-huggingface-registry-apply
+  # This account already has a token.actions.githubusercontent.com OIDC
+  # provider (created by another project) — must match what was used for
+  # the local bootstrap apply, or CI tries to create a duplicate and gets
+  # AccessDenied (gha-apply intentionally lacks iam:CreateOpenIDConnectProvider).
+  EXISTING_OIDC_PROVIDER_ARN: arn:aws:iam::646821141010:oidc-provider/token.actions.githubusercontent.com
 
 jobs:
   apply:
@@ -54,4 +59,6 @@ jobs:
           terraform apply -input=false -auto-approve \
             -var="aws_account_id=${{ env.AWS_ACCOUNT_ID }}" \
             -var="aws_region=${{ env.AWS_REGION }}" \
-            -var="github_org=${{ github.repository_owner }}"
+            -var="github_org=${{ github.repository_owner }}" \
+            -var="create_oidc_provider=false" \
+            -var="existing_oidc_provider_arn=${{ env.EXISTING_OIDC_PROVIDER_ARN }}"
