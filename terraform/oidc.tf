@@ -30,7 +30,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   # GitHub's OIDC signing certificate root thumbprint. AWS has validated
   # against the full CA chain (not just this pinned value) since 2023, but
   # the argument is still required by the resource.
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
 locals {
