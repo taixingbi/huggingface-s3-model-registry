@@ -5,7 +5,19 @@
 #   gha-apply     -> terraform apply, assumable only from github_branch
 #   gha-sync      -> sync_models.py write access, assumable only from github_branch
 #   registry-read -> attach to EKS/vLLM/RAG service roles that only ever read
+#
+# NOTE (sub claim format): repos created after 2026-07-15 get GitHub's
+# "immutable subject claim" format by default — the sub embeds the numeric
+# owner/repo IDs, e.g. repo:OWNER@OWNER_ID/REPO@REPO_ID:ref:refs/heads/main,
+# instead of the classic repo:OWNER/REPO:ref:refs/heads/main. This repo uses
+# that new format (confirmed via CloudTrail), so github_owner_id /
+# github_repo_id below are required, not cosmetic.
 # -----------------------------------------------------------------------------
+
+locals {
+  # repo:OWNER@OWNER_ID/REPO@REPO_ID — see NOTE above.
+  github_sub_repo = "${var.github_org}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
+}
 
 data "aws_iam_policy_document" "gha_assume_any_ref" {
   statement {
@@ -26,7 +38,7 @@ data "aws_iam_policy_document" "gha_assume_any_ref" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:*"]
+      values   = ["repo:${local.github_sub_repo}:*"]
     }
   }
 }
@@ -50,14 +62,14 @@ data "aws_iam_policy_document" "gha_assume_protected_branch" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:ref:refs/heads/${var.github_branch}"]
+      values   = ["repo:${local.github_sub_repo}:ref:refs/heads/${var.github_branch}"]
     }
   }
 }
 
 # terraform-apply.yml runs its job with `environment: production`. Any job
 # that declares a GitHub Actions `environment:` gets an OIDC sub claim of
-# repo:ORG/REPO:environment:NAME instead of repo:ORG/REPO:ref:refs/heads/BRANCH
+# repo:.../...:environment:NAME instead of repo:.../...:ref:refs/heads/BRANCH
 # — so gha_apply needs its own trust condition matching that form, not the
 # branch-ref one used by gha_assume_protected_branch above.
 data "aws_iam_policy_document" "gha_assume_environment" {
@@ -79,7 +91,7 @@ data "aws_iam_policy_document" "gha_assume_environment" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:environment:${var.github_environment}"]
+      values   = ["repo:${local.github_sub_repo}:environment:${var.github_environment}"]
     }
   }
 }

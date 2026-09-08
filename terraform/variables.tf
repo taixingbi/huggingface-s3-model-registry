@@ -26,6 +26,18 @@ variable "github_repo" {
   default     = "huggingface-s3-model-registry"
 }
 
+variable "github_owner_id" {
+  description = "Numeric GitHub user/org ID for github_org. Required because this repo was created after 2026-07-15 and uses GitHub's immutable OIDC subject-claim format (repo:OWNER@OWNER_ID/REPO@REPO_ID:...) instead of the classic repo:OWNER/REPO:... form. Find it via CloudTrail (userIdentity.userName on a failed/succeeded AssumeRoleWithWebIdentity event) or `gh api users/<org>` -> .id."
+  type        = string
+  default     = "23156713"
+}
+
+variable "github_repo_id" {
+  description = "Numeric GitHub repository ID for github_repo. See github_owner_id for why this is required. Find it via `gh api repos/<org>/<repo>` -> .id."
+  type        = string
+  default     = "1361377686"
+}
+
 variable "github_branch" {
   description = "Branch allowed to assume the sync-models role via OIDC (that workflow has no `environment:` key, so its OIDC sub claim is branch-ref based). Pull requests from other branches only get plan/read access."
   type        = string
